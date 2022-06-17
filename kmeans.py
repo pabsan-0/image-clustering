@@ -10,7 +10,9 @@ import glob
 import random
 import seaborn as sns
 import matplotlib.pyplot as plt
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+
+
 
 class FeatureExtractor(nn.Module):
     def __init__(self, model):
@@ -39,64 +41,83 @@ class FeatureExtractor(nn.Module):
 
 
 
-# Transform the image, so it becomes readable with the model
-transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.CenterCrop(512),
-    transforms.Resize(448),
-    transforms.ToTensor()                              
-])
+class MyDataset(Dataset):
+    def __init__(self , image_paths, device='cpu'):
+        """ This dataset class helps fetching each image and its airport
+        from a directory while allowing easy batching.
+        """
+        self.image_paths = image_paths
+        self.device = device
+        self.transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize(448),
+            transforms.CenterCrop(448),
+            transforms.ToTensor()                              
+        ])
 
-CLUSTERS = 20
-air2int = {
-    'aerohispalis': 0,
-    'beas': 1,
-    'oran': 2,
-    'atlas': 3,
-    'ilipa': 4,
-}
+    def __getitem__(self, idx): 
+        # Fetch image and
+        img_path = self.image_paths[idx]
+        airport = img_path.split('/')[-1].split('_')[0]
+
+        # Process the image to match network
+        img = cv2.imread(img_path)
+        img = self.transform(img)
+        img = img.to(self.device)
+        return img, img_path, airport
+
+    def __len__(self):
+        return len(self.image_paths) 
+
+
 
 
 if __name__ == "__main__":
 
-    # Sort gpu/cpu and boot the model
+    # Shuffle and slice a subset for faster testing
+    input_images = glob.glob('samples/*.jpg')
+    random.shuffle(input_images)
+    input_images = input_images[:1000]
+    CLUSTERS = 20
+
+    
+    ## Featurization of images
+
+    # Deep learning prep junk
     device = torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
     model = models.vgg16(pretrained=True)
     model = FeatureExtractor(model).to(device)
 
-
-    # Placeholders, notice their sorting matches
-    images = glob.glob('samples/*.jpg')
+    # Placeholders to keep track of image-feature-airport triplets
+    images = []
     features = []
     airports = []
 
-    random.shuffle(images)
-    images = images[:20]
+    # These allow flexible batching
+    dataset = MyDataset(input_images, device)
+    dataloader = DataLoader(dataset , batch_size=6, shuffle=True)
 
-    # Featurization of images
-    for img_path in tqdm(images):
-        airport = img_path.split('/')[-1].split('_')[0]
-        airports.append(airport)
-
-        # Read and apply transformations
-        img = cv2.imread(img_path)
-        img = transform(img)
-
-        # [batch_size, channels, width, height]
-        img = img.reshape(1, 3, 448, 448)
-        img = img.to(device)
-
-        # We only extract features, so we don't need gradient
+    # Batch inference
+    for img_batch, img_path, airport in tqdm(dataloader):
         with torch.no_grad():
-            features.append(model(img).cpu().detach().numpy().reshape(-1))
+            batch_feat = model(img_batch)
 
-    # Convert to NumPy Array
-    features = np.array(features)
+        # De-batch the results to their placeholders
+        images.extend(img_path)
+        features.extend([bf.cpu().detach().numpy().reshape(-1) for bf in batch_feat])
+        airports.extend(airport)
 
-    # Initialize the model
+
+
+    ## Clustering
+
     model = KMeans(n_clusters=CLUSTERS, random_state=42)
-    model.fit(features)
-    labels = model.labels_ # [4 3 3 ... 0 0 0]
+    model.fit(np.array(features))
+    labels = model.labels_
+
+
+
+    ## Analysis
 
     # Dataframe and confusion matrix
     df = pd.DataFrame({'label': labels, 'airport': airports, 'image': images})
