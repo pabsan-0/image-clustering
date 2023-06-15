@@ -148,7 +148,7 @@ def featurize(images):
 
     # These allow flexible batching
     dataset = MyDataset(input_images, device)
-    dataloader = DataLoader(dataset , batch_size=6, shuffle=True)
+    dataloader = DataLoader(dataset , batch_size=3, shuffle=True)
 
     # Batch inference
     for img_batch, img_path in tqdm(dataloader):
