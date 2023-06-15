@@ -3,6 +3,8 @@
 Simple K-means clustering of VGG-16 featurized images.
 
 
+![image](cache/clusters.png)
+
 ## Requirements
 
 - Install through pip: `$ pip3 install requirements.txt`
