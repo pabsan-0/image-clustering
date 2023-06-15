@@ -3,15 +3,22 @@
 Simple K-means clustering of VGG-16 featurized images.
 
 
+## Requirements
+
+- Install through pip: `$ pip3 install requirements.txt`
+- The following are also needed, yet commented out in the requirements file not to mess with your versions:
+    - Pytorch
+    - Opencv
+
+
 ## Usage
 
-- Install requirements and run:
+- Run featurization & clustering with: 
 ```
-$ pip3 install requirements.txt
 $ python3 main.py --n-clusters 5 --no-use-cache samples/*.jpg
 ```
-
-- Find the output in `cache/groups/*.txt`. The you can do some stuff like:
+- An image-cluster preview is stored in `cache/clusters.png`.
+- Find the output in `cache/groups/*.txt` as path lists of your files by cluster. The you can do some stuff like:
 ```
 # Verify listed items exist
 cat cache/groups/0.txt | xargs ls
@@ -21,9 +28,9 @@ cat cache/groups/0.txt | xargs cp -t .
 cat cache/groups/0.txt | xargs realpath | xargs ln -st .
 ```
 
-- An image-cluster preview is stored in `cache/clusters.png`.
+By default, intermediate files containing the list of input images and their features will be stored on disk. If trying to re-featurize the very same images, cached features will be loaded to save time.
 
-- See available args:
+## Scripts
 
 ```
 $ python3 main.py --help 
@@ -47,3 +54,10 @@ optional arguments:
 - `RuntimeError: CUDA error: CUBLAS_STATUS_ALLOC_FAILED when calling 'cublasCreate(handle)'`
     - Random error, just rerun
     - If persisting, try decreasing batch size in the dataloader func
+
+
+## Diving deeper
+
+- https://datagen.tech/guides/computer-vision/vgg16/
+- https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html
+- https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_silhouette_analysis.html
