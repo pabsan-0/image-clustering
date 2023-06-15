@@ -1,4 +1,3 @@
-from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_samples, silhouette_score
 

@@ -125,7 +125,6 @@ class MyUtils:
                 clus_imdata.append(img)
                 clus_imdata.append(np.ones([PREVIEW_IM_H, PREVIEW_GAP, 3]) * 255)
 
-            globals().update(locals())
             canvas.append(np.hstack(clus_imdata))
             canvas.append(np.ones([PREVIEW_GAP, PREVIEW_COLS * (PREVIEW_IM_W + PREVIEW_GAP), 3]))
 
@@ -182,6 +181,7 @@ def cluster(images: np.array, features: np.array, n=10):
 if __name__ == "__main__":
     args = parse_args()
 
+    assert args.images, "Positional argument `images` was not provided."
     input_images = [ii for ii in args.images if Path(ii).suffix in ALLOWED_IMAGE_EXTENSIONS]
     random.shuffle(input_images)
     
