@@ -1,0 +1,7 @@
+samples/cat01.webp
+samples/cat04.jpeg
+samples/dog01.jpeg
+samples/toucan00.jpeg
+samples/toucan01.jpeg
+samples/cat05.jpg
+samples/cat06.jpg

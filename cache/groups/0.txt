@@ -1,0 +1,2 @@
+samples/cat03.webp
+samples/dog02.jpg
