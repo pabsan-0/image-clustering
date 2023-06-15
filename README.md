@@ -46,3 +46,4 @@ optional arguments:
 
 - `RuntimeError: CUDA error: CUBLAS_STATUS_ALLOC_FAILED when calling 'cublasCreate(handle)'`
     - Random error, just rerun
+    - If persisting, try decreasing batch size in the dataloader func
