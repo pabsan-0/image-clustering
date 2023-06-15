@@ -1,4 +1,5 @@
 samples/*
 out/*
+.vscode
 !.gitkeep
 cache

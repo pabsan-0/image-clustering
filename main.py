@@ -3,7 +3,6 @@ from pathlib import Path
 import torch
 from torch import nn
 from torchvision import models, transforms
-import cv2
 from sklearn.cluster import KMeans
 import pandas as pd
 from tqdm import tqdm
@@ -12,24 +11,32 @@ import random
 from torch.utils.data import Dataset, DataLoader
 from typing import List
 import shutil
+import cv2
+    
 
+CACHE_FEAT_IMAGES = Path("./cache/images.txt")
+CACHE_FEAT_FEATURES = Path("./cache/features.txt")
+CACHE_CLUS_PREVIEW = Path("./cache/clusters.png")
+CACHE_CLUS_GROUPS = Path("./cache/groups")
 
-CACHE_IMGS = Path("./cache/images.txt")
-CACHE_FEAT = Path("./cache/features.txt")
-CACHE_CIMG = Path("./cache/clusters.png")
-CACHE_CLST = Path("./cache/groups")
+FEATURIZER_IMSIZE = 448
 
+PREVIEW_COLS = 5
+PREVIEW_IM_H = 300
+PREVIEW_IM_W = 400
+PREVIEW_GAP = 10
 
-IMAGE_EXTENSIONS = [".jpeg", ".png", ".jpg", ".webp"]
+ALLOWED_IMAGE_EXTENSIONS = [".jpeg", ".png", ".jpg", ".webp"]
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--no-save-cache', type=bool, default=False)
-    parser.add_argument('--no-use-cache',  type=bool, default=False)
-    parser.add_argument('--no-preview',    type=bool, default=False)
-    parser.add_argument('--n-clusters',    type=int, default=3)
-    parser.add_argument('unnamed_args', nargs=argparse.REMAINDER)
+    parser.add_argument('-n', '--n-clusters', type=int, default=3,  help="K means number of clusters")
+    parser.add_argument('--no-save-cache',    action='store_true',  help="Do not cache features")
+    parser.add_argument('--no-use-cache',     action='store_true',  help="Do not load features from cache")
+    parser.add_argument('--no-preview',       action='store_true',  help="Do not build a preview image")
+    parser.add_argument('images', nargs=argparse.REMAINDER,         help="Images to cluster, accepts a glob")
 
     return parser.parse_args()
 
@@ -70,8 +77,8 @@ class MyDataset(Dataset):
         self.device = device
         self.transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize(448),
-            transforms.CenterCrop(448),
+            transforms.Resize(FEATURIZER_IMSIZE),
+            transforms.CenterCrop(FEATURIZER_IMSIZE),
             transforms.ToTensor()                              
         ])
 
@@ -87,6 +94,43 @@ class MyDataset(Dataset):
 
     def __len__(self):
         return len(self.image_paths) 
+
+
+class MyUtils:
+
+    @staticmethod
+    def np_loadtxt_or_none(path):
+        try:
+            return np.loadtxt(path, dtype=object)
+        except FileNotFoundError:
+            return np.array([])
+
+
+    @staticmethod
+    def build_clustered_img(cluster_list: List[List[str]]):
+        canvas = []
+        canvas.append(np.ones([PREVIEW_GAP, PREVIEW_COLS * (PREVIEW_IM_W + PREVIEW_GAP), 3]))
+        for ii, clus in enumerate(cluster_list):
+            
+            clus = random.sample(clus, min(len(clus), PREVIEW_COLS))
+            while len(clus) < PREVIEW_COLS:
+                clus.append(np.ones([PREVIEW_IM_H, PREVIEW_IM_W, 3]) * 255)
+            
+            clus_imdata = []
+            for path in clus:
+                img = cv2.imread(path) if isinstance(path,str) else path
+                path = path if isinstance(path, str) else ""
+                img = cv2.resize(img, (PREVIEW_IM_W, PREVIEW_IM_H))
+                img = cv2.putText(img, str(ii) + path, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255))
+                clus_imdata.append(img)
+                clus_imdata.append(np.ones([PREVIEW_IM_H, PREVIEW_GAP, 3]) * 255)
+
+            globals().update(locals())
+            canvas.append(np.hstack(clus_imdata))
+            canvas.append(np.ones([PREVIEW_GAP, PREVIEW_COLS * (PREVIEW_IM_W + PREVIEW_GAP), 3]))
+
+        canvas = np.vstack(canvas)
+        return canvas
 
 
 
@@ -134,56 +178,17 @@ def cluster(images: np.array, features: np.array, n=10):
     return groups, images, cluster_list
 
 
-def np_loadtxt_or_none(path):
-    try:
-        return np.loadtxt(path, dtype=object)
-    except FileNotFoundError:
-        return np.array([])
-
-
-
-def build_clustered_img(cluster_list: List[List[str]]):
-    DISPLAY_COLS = 5
-    DISPLAY_IM_H = 300
-    DISPLAY_IM_W = 400
-    DISPLAY_GAP = 10
-
-    canvas = []
-    canvas.append(np.ones([DISPLAY_GAP, DISPLAY_COLS * (DISPLAY_IM_W + DISPLAY_GAP), 3]))
-    for ii, clus in enumerate(cluster_list):
-        
-        clus = random.sample(clus, min(len(clus), DISPLAY_COLS))
-        while len(clus) < DISPLAY_COLS:
-            clus.append(np.ones([DISPLAY_IM_H, DISPLAY_IM_W, 3]) * 255)
-        
-        clus_imdata = []
-        for path in clus:
-            img = cv2.imread(path) if isinstance(path,str) else path
-            path = path if isinstance(path, str) else ""
-            img = cv2.resize(img, (DISPLAY_IM_W, DISPLAY_IM_H))
-            img = cv2.putText(img, str(ii) + path, (20,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255))
-            clus_imdata.append(img)
-            clus_imdata.append(np.ones([DISPLAY_IM_H, DISPLAY_GAP, 3]) * 255)
-
-        globals().update(locals())
-        canvas.append(np.hstack(clus_imdata))
-        canvas.append(np.ones([DISPLAY_GAP, DISPLAY_COLS * (DISPLAY_IM_W + DISPLAY_GAP), 3]))
-
-    canvas = np.vstack(canvas)
-    return canvas
-
-
 
 if __name__ == "__main__":
     args = parse_args()
 
-    input_images = [ii for ii in args.unnamed_args if Path(ii).suffix in IMAGE_EXTENSIONS]
+    input_images = [ii for ii in args.images if Path(ii).suffix in ALLOWED_IMAGE_EXTENSIONS]
     random.shuffle(input_images)
     
     
     # Compute features or load from cache
-    cached_images = np_loadtxt_or_none(CACHE_IMGS)
-    cached_features = np_loadtxt_or_none(CACHE_FEAT)
+    cached_images = MyUtils.np_loadtxt_or_none(CACHE_FEAT_IMAGES)
+    cached_features = MyUtils.np_loadtxt_or_none(CACHE_FEAT_FEATURES)
     if set(input_images) == set(cached_images) and not args.no_use_cache:
         images, features = cached_images, cached_features
     else:
@@ -192,9 +197,9 @@ if __name__ == "__main__":
 
     # Save features if not told otherwise only if they are new
     if not (args.no_save_cache or features is cached_features):
-        CACHE_CLST.mkdir(parents=True, exist_ok=True)
-        np.savetxt(CACHE_FEAT, features, fmt='%s')
-        np.savetxt(CACHE_IMGS, images, fmt='%s')
+        CACHE_CLUS_GROUPS.mkdir(parents=True, exist_ok=True)
+        np.savetxt(CACHE_FEAT_FEATURES, features, fmt='%s')
+        np.savetxt(CACHE_FEAT_IMAGES, images, fmt='%s')
 
 
     
@@ -202,20 +207,20 @@ if __name__ == "__main__":
     while True:
 
         # Create dump dir for clusters
-        shutil.rmtree(CACHE_CLST, ignore_errors=True)
-        CACHE_CLST.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(CACHE_CLUS_GROUPS, ignore_errors=True)
+        CACHE_CLUS_GROUPS.mkdir(parents=True, exist_ok=True)
 
         group, image, cluster_list = cluster(images, features, n=num_clusters)
         
         # Groups output
         for ii, clus in enumerate(cluster_list):
-            np.savetxt(CACHE_CLST / (str(ii) + ".txt"), clus, fmt='%s')
+            np.savetxt(CACHE_CLUS_GROUPS / (str(ii) + ".txt"), clus, fmt='%s')
         
         # Preview output
         if not args.no_preview:
-            preview = build_clustered_img(cluster_list)
-            cv2.imwrite(CACHE_CIMG.as_posix(), preview)
-            print("Image saved to", CACHE_CIMG)
+            preview = MyUtils.build_clustered_img(cluster_list)
+            cv2.imwrite(CACHE_CLUS_PREVIEW.as_posix(), preview)
+            print("Image saved to", CACHE_CLUS_PREVIEW)
         
         # Close loop
         try:

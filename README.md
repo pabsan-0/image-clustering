@@ -1,56 +1,48 @@
 # Image clustering
 
-[TOC]
+Simple K-means clustering of VGG-16 featurized images.
+
 
 ## Usage
 
-### Locate your images
+- Install requirements and run:
+```
+$ pip3 install requirements.txt
+$ python3 main.py --n-clusters 5 --no-use-cache samples/*.jpg
+```
 
-- Place your images in the `samples/` dir, with `.jpg` entension. This is regex-hardcoded in the scripts.
-- RECOMMENDED: **symlink** your images in there instead of copying them:
-  - Avoids wasting disk space 
-  - Allows you to retain your file tree somewhere else
-  - You can fake-change the image extension by renaming just the symlink
-- The available `Makefile` automates **my** setup, so you have an idea how to do this. 
+- Find the output in `cache/groups/*.txt`. The you can do some stuff like:
+```
+# Verify listed items exist
+cat cache/groups/0.txt | xargs ls
 
+# Move/link image to pwd
+cat cache/groups/0.txt | xargs cp -t .
+cat cache/groups/0.txt | xargs realpath | xargs ln -st .
+```
 
-### On the go featurizer
-This is the simplest way of using this software. For lots of images, we recommend following the steps in the following section instead.
+- An image-cluster preview is stored in `cache/clusters.png`.
 
-- Run `python3 complete_run.py` to have the images featurized and clustered in one go. 
-  - It may take a while. 
-  - It will NOT save the featurizer results to a file
-  - It will save the results dataframet to the hardcoded path `out/kmeans_run.csv` 
+- See available args:
 
+```
+$ python3 main.py --help 
+usage: main.py [-h] [-n N_CLUSTERS] [--no-save-cache] [--no-use-cache] [--no-preview] ...
 
+positional arguments:
+  images                Images to cluster, accepts a glob
 
-### Featurize then cluster
-**Understand** and run these two scripts to first featurize and then cluster those images anytime from the extracted features. Highly recommended if featurizing takes long.
-
-- `featurizer.py`:  `python3 featurizer.py out/features.pickle`
-  - Uses a pretrained VGG18 network to batch-featurize images
-  - By default, takes the images in `samples/*jpg` (hardcode path inside)
-  - Results will be serialized to `out/features.pickle` to a python `dict`:
-    ```
-    {
-        images:     [samples/img1.jpg, ... ,samples/img1000.jpg],
-        airports:   [atlas, ... , ilipa],
-        features:   [torch.Tensor(*), ... , torch.Tensor(*)]
-    }
-    ```
-  - Respect the extension of the output file: `pickle` or `pkl`. Name/path can be custom.
-
-
-- `kmeans.py`:  `python3 kmeans.py out/features.pickle [path/out.csv]`
-  - Loads the features from `featurizer.py`, stored in `out/features.pickle`.
-  - Uses these features to **cluster** the images with standard K-means.
-  - Optionally provide `path/out.csv` to store a python `pd.DataFrame` as in:
-    ```
-    images:     pd.Series[samples/img1.jpg, ... ,samples/img1000.jpg],
-    airports:   pd.Series[atlas, ... , ilipa],
-    label:      pd.Series[0, ... , 1]
-    ```
-  - Respect the extension of the input and output files. Output must be `csv`.
-  - Adjust the clustering properties by hardcoding the script.
+optional arguments:
+  -h, --help            show this help message and exit
+  -n N_CLUSTERS, --n-clusters N_CLUSTERS
+                        K means number of clusters
+  --no-save-cache       Do not cache features
+  --no-use-cache        Do not load features from cache
+  --no-preview          Do not build a preview image
+```
 
 
+## Known issues
+
+- `RuntimeError: CUDA error: CUBLAS_STATUS_ALLOC_FAILED when calling 'cublasCreate(handle)'`
+    - Random error, just rerun
