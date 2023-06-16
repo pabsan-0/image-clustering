@@ -12,7 +12,7 @@ services:
         volumes:
             - $PWD:/host
         runtime: nvidia
-        deploy:g
+        deploy:
             resources:
                 reservations:
                     devices:
