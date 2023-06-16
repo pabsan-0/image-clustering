@@ -110,14 +110,18 @@ class MyUtils:
     def build_clustered_img(cluster_list: List[List[str]]):
         canvas = []
         canvas.append(np.ones([PREVIEW_GAP, PREVIEW_COLS * (PREVIEW_IM_W + PREVIEW_GAP), 3]))
+
+        # Each iteration processes a whole cluster, displayed horizontally
         for ii, clus in enumerate(cluster_list):
             
-            clus = random.sample(clus, min(len(clus), PREVIEW_COLS))
-            while len(clus) < PREVIEW_COLS:
-                clus.append(np.ones([PREVIEW_IM_H, PREVIEW_IM_W, 3]) * 255)
+            # Draw samples for the preview and fill with blanks if not enough
+            clus_sampled = random.sample(clus, min(len(clus), PREVIEW_COLS))
+            while len(clus_sampled) < PREVIEW_COLS:
+                clus_sampled.append(np.ones([PREVIEW_IM_H, PREVIEW_IM_W, 3]) * 255)
             
+            # Each iteration adds a sample from this cluster
             clus_imdata = []
-            for path in clus:
+            for path in clus_sampled:
                 img = cv2.imread(path) if isinstance(path,str) else path
                 path = path if isinstance(path, str) else ""
                 img = cv2.resize(img, (PREVIEW_IM_W, PREVIEW_IM_H))
@@ -125,9 +129,14 @@ class MyUtils:
                 clus_imdata.append(img)
                 clus_imdata.append(np.ones([PREVIEW_IM_H, PREVIEW_GAP, 3]) * 255)
 
-            canvas.append(np.hstack(clus_imdata))
+            # Join this cluster horizontally w/ a gap, write its number of instances
+            clus_imdata = np.hstack(clus_imdata)
+            clus_imdata = cv2.putText(clus_imdata, str(len(clus)), (20, PREVIEW_IM_H // 2), cv2.FONT_HERSHEY_SIMPLEX, 3, (1,1,1),       20)
+            clus_imdata = cv2.putText(clus_imdata, str(len(clus)), (20, PREVIEW_IM_H // 2), cv2.FONT_HERSHEY_SIMPLEX, 3, (255,255,255), 10)
+            canvas.append(clus_imdata)
             canvas.append(np.ones([PREVIEW_GAP, PREVIEW_COLS * (PREVIEW_IM_W + PREVIEW_GAP), 3]))
 
+        # Join all cluster rows vertically    
         canvas = np.vstack(canvas)
         return canvas
 
@@ -188,8 +197,7 @@ if __name__ == "__main__":
     assert args.images, "Positional argument `images` was not provided."
     input_images = [ii for ii in args.images if Path(ii).suffix in ALLOWED_IMAGE_EXTENSIONS]
     random.shuffle(input_images)
-    
-    
+
     # Compute features or load from cache
     cached_images = MyUtils.np_loadtxt_or_none(CACHE_FEAT_IMAGES)
     cached_features = MyUtils.np_loadtxt_or_none(CACHE_FEAT_FEATURES)
@@ -197,7 +205,7 @@ if __name__ == "__main__":
         images, features = cached_images, cached_features
     else:
         images, features = featurize(input_images, args.batch_size)
-   
+
 
     # Save features if not told otherwise only if they are new
     if not (args.no_save_cache or features is cached_features):
