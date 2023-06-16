@@ -1,3 +1,2 @@
-samples/dog03.jpg
-samples/dog04.jpg
-samples/dog00.jpg
+./samples/dog04.jpg
+./samples/dog03.jpg

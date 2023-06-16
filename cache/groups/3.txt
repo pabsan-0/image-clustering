@@ -1,1 +1,1 @@
-samples/cat00.webp
+./samples/toucan01.jpeg
