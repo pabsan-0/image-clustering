@@ -7,11 +7,12 @@ Simple K-means clustering of VGG-16 featurized images.
 
 ## Requirements
 
-- Install through pip: `$ pip3 install requirements.txt`
-- The following are also needed, yet commented out in the requirements file not to mess with your versions:
+- Install through pip: `$ pip3 install -r requirements.txt`
+- The following are also needed, mind that you have no version collisions:
     - Pytorch
     - Opencv
 
+Optionally, use Docker to run a `pytorch` container: `docker compose run pytorch`. You still need to install deps from `requirements.txt`.
 
 ## Usage
 
@@ -20,12 +21,12 @@ Simple K-means clustering of VGG-16 featurized images.
 $ python3 main.py --n-clusters 5 --no-use-cache samples/*.jpg
 ```
 - An image-cluster preview is stored in `cache/clusters.png`.
-- Find the output in `cache/groups/*.txt` as path lists of your files by cluster. The you can do some stuff like:
+- Find the output in `cache/groups/*.txt` as path lists of your files by cluster. Then you can do some stuff like:
 ```
 # Verify listed items exist
 cat cache/groups/0.txt | xargs ls
 
-# Move/link image to pwd
+# Copy/link image to pwd
 cat cache/groups/0.txt | xargs cp -t .
 cat cache/groups/0.txt | xargs realpath | xargs ln -st .
 ```
