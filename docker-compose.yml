@@ -1,0 +1,21 @@
+version: '3.9'
+
+services:
+    pytorch:
+        image: pytorch/pytorch:latest 
+        container_name: pytorch 
+        shm_size: 64gb
+        tty: true
+        stdin_open: true
+        network_mode: host
+        working_dir: /host
+        volumes:
+            - $PWD:/host
+        runtime: nvidia
+        deploy:g
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: 1
+                          capabilities: [gpu]
