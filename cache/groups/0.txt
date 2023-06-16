@@ -1,2 +1,9 @@
-samples/cat03.webp
-samples/dog02.jpg
+./samples/cat00.webp
+./samples/dog01.jpeg
+./samples/cat03.webp
+./samples/cat06.jpg
+./samples/cat04.jpeg
+./samples/toucan00.jpeg
+./samples/cat01.webp
+./samples/dog00.jpg
+./samples/cat05.jpg
