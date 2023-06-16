@@ -20,6 +20,7 @@ CACHE_CLUS_PREVIEW = Path("./cache/clusters.png")
 CACHE_CLUS_GROUPS = Path("./cache/groups")
 
 FEATURIZER_IMSIZE = 448
+FEATURIZER_NUM_WORKERS = torch.multiprocessing.cpu_count()
 
 PREVIEW_COLS = 5
 PREVIEW_IM_H = 300
@@ -33,10 +34,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-n', '--n-clusters', type=int, default=3,  help="K means number of clusters")
+    parser.add_argument('-b', '--batch-size', type=int, default=6,  help="Batch size for VGG16 inference")
     parser.add_argument('--no-save-cache',    action='store_true',  help="Do not cache features")
     parser.add_argument('--no-use-cache',     action='store_true',  help="Do not load features from cache")
     parser.add_argument('--no-preview',       action='store_true',  help="Do not build a preview image")
-    parser.add_argument('images', nargs=argparse.REMAINDER,         help="Images to cluster, accepts a glob")
+    parser.add_argument('images', nargs=argparse.ONE_OR_MORE, help="Images to cluster, accepts a glob")
 
     return parser.parse_args()
 
@@ -60,7 +62,6 @@ class FeatureExtractor(nn.Module):
         self.fc = model.classifier[0]
     
     def forward(self, x):
-        # It will take the input 'x' until it returns the feature vector called 'out'
         out = self.features(x)
         out = self.pooling(out)
         out = self.flatten(out)
@@ -69,12 +70,11 @@ class FeatureExtractor(nn.Module):
 
 
 class MyDataset(Dataset):
-    def __init__(self , image_paths, device='cpu'):
-        """ This dataset class helps fetching each image and its airport
-        from a directory while allowing easy batching.
+    def __init__(self , image_paths):
+        """ This dataset class helps fetching each image from a directory while
+        allowing easy transforms and batching.
         """
         self.image_paths = image_paths
-        self.device = device
         self.transform = transforms.Compose([
             transforms.ToPILImage(),
             transforms.Resize(FEATURIZER_IMSIZE),
@@ -89,7 +89,7 @@ class MyDataset(Dataset):
         # Process the image to match network
         img = cv2.imread(img_path)
         img = self.transform(img)
-        img = img.to(self.device)
+        # Only CPU operations here so I can use multiprocessing dataloaders
         return img, img_path
 
     def __len__(self):
@@ -134,7 +134,7 @@ class MyUtils:
 
 
 
-def featurize(images):
+def featurize(images, batch_size=6):
     
     # Deep learning prep junk
     device = torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
@@ -146,12 +146,16 @@ def featurize(images):
     features = []
 
     # These allow flexible batching
-    dataset = MyDataset(input_images, device)
-    dataloader = DataLoader(dataset , batch_size=3, shuffle=True)
+    dataset = MyDataset(input_images)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, 
+        num_workers=FEATURIZER_NUM_WORKERS
+    )
 
     # Batch inference
     for img_batch, img_path in tqdm(dataloader):
         with torch.no_grad():
+            # Send to GPU here so I can use multiprocessing dataloaders
+            img_batch = img_batch.to(device, non_blocking=True)
             batch_feat = model(img_batch)
 
         # De-batch the results to their placeholders
@@ -192,7 +196,7 @@ if __name__ == "__main__":
     if set(input_images) == set(cached_images) and not args.no_use_cache:
         images, features = cached_images, cached_features
     else:
-        images, features = featurize(input_images)
+        images, features = featurize(input_images, args.batch_size)
    
 
     # Save features if not told otherwise only if they are new
