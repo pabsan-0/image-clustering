@@ -12,6 +12,11 @@ services:
         volumes:
             - $PWD:/host
         runtime: nvidia
+        entrypoint: ["/bin/bash","-c"]
+        command:
+        - |    
+            pip3 install -r requirements.txt && 
+            bash
         deploy:
             resources:
                 reservations:
